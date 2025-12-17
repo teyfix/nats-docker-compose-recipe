@@ -1,0 +1,80 @@
+x-healthcheck: &healthcheck
+  interval: 30s
+  timeout: 5s
+  retries: 15
+  start_period: 3s
+  start_interval: 1s
+
+x-nats-box: &nats-box
+  image: natsio/nats-box:${NATS_BOX_VER?:}
+  restart: no
+  entrypoint: /bin/sh
+  environment:
+    - NATS_OPERATOR
+    - NATS_ACCOUNT
+
+networks:
+  nats:
+    driver: bridge
+
+volumes:
+  nsc_data:
+  nsc_config:
+  nats_data:
+
+services:
+  nats-init:
+    <<: *nats-box
+    command: /entrypoint.sh
+    volumes:
+      - nsc_data:/nsc
+      - nsc_config:/config
+      - ${PWD}/fs/nats-init/entrypoint.sh:/entrypoint.sh:ro
+
+  nats-server:
+    image: nats:${NATS_VER?:}
+    restart: unless-stopped
+    command: -c /etc/nats/nats.conf
+    ports:
+      - 4222:4222 # NATS
+      - 6222:6222 # Cluster
+      - 8222:8222 # Monitoring
+      - 9222:9222 # WebSocket
+    volumes:
+      - nats_data:/data
+      - nsc_config:/etc/nats/nsc:ro
+      - ${PWD}/fs/nats-server/etc/nats/nats.conf:/etc/nats/nats.conf:ro
+    networks:
+      nats:
+        aliases:
+          - nats.lokal
+
+    depends_on:
+      nats-init:
+        condition: service_completed_successfully
+
+    healthcheck:
+      <<: *healthcheck
+      test: [CMD-SHELL, wget -q --spider http://localhost:8222/healthz]
+
+  nats-push:
+    <<: *nats-box
+    command: [-c, "nsc push -A"]
+    volumes:
+      - nsc_data:/nsc
+    networks:
+      - nats
+    depends_on:
+      nats-server:
+        condition: service_healthy
+
+  nats-export:
+    <<: *nats-box
+    command: /entrypoint.sh
+    volumes:
+      - nsc_data:/nsc
+      - ${PWD}/fs/nats-export/secrets:/secrets:rw
+      - ${PWD}/fs/nats-export/entrypoint.sh:/entrypoint.sh:ro
+    depends_on:
+      nats-push:
+        condition: service_completed_successfully

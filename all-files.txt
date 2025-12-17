@@ -1,0 +1,1338 @@
+bun.lock
+{
+  "lockfileVersion": 1,
+  "workspaces": {
+    "": {
+      "dependencies": {
+        "@nats-io/jwt": "^0.0.10-5",
+        "@types/node": "^25.0.3",
+        "dotenv": "^17.2.3",
+        "nats": "^2.29.3",
+        "nats.ws": "^1.30.3",
+        "nkeys.js": "^1.1.0",
+      },
+      "devDependencies": {
+        "@types/bun": "latest",
+      },
+      "peerDependencies": {
+        "typescript": "^5",
+      },
+    },
+  },
+  "packages": {
+    "@nats-io/jwt": ["@nats-io/jwt@0.0.10-5", "", { "dependencies": { "@nats-io/nkeys": "^1.2.0-4" } }, "sha512-DoBIEJIgWZJLtMRef+oFvk1lEgyTIVcAZbBXYGm91B7az1bCu7A3Npsn/VD7RH5waYAz+EPS8Ot7zyU6iKAuqg=="],
+
+    "@nats-io/nkeys": ["@nats-io/nkeys@1.2.0-8", "", { "dependencies": { "tweetnacl": "^1.0.3" } }, "sha512-o6nfNYySzVZL7mIJA+ejD3JdMFbLn9VWtptM2cnHh4jeF/FvhPhCkn8BH4jQE7asCV/SSialu6jGhsAFV1FKkQ=="],
+
+    "@types/bun": ["@types/bun@1.3.4", "", { "dependencies": { "bun-types": "1.3.4" } }, "sha512-EEPTKXHP+zKGPkhRLv+HI0UEX8/o+65hqARxLy8Ov5rIxMBPNTjeZww00CIihrIQGEQBYg+0roO5qOnS/7boGA=="],
+
+    "@types/node": ["@types/node@25.0.3", "", { "dependencies": { "undici-types": "~7.16.0" } }, "sha512-W609buLVRVmeW693xKfzHeIV6nJGGz98uCPfeXI1ELMLXVeKYZ9m15fAMSaUPBHYLGFsVRcMmSCksQOrZV9BYA=="],
+
+    "bun-types": ["bun-types@1.3.4", "", { "dependencies": { "@types/node": "*" } }, "sha512-5ua817+BZPZOlNaRgGBpZJOSAQ9RQ17pkwPD0yR7CfJg+r8DgIILByFifDTa+IPDDxzf5VNhtNlcKqFzDgJvlQ=="],
+
+    "dotenv": ["dotenv@17.2.3", "", {}, "sha512-JVUnt+DUIzu87TABbhPmNfVdBDt18BLOWjMUFJMSi/Qqg7NTYtabbvSNJGOJ7afbRuv9D/lngizHtP7QyLQ+9w=="],
+
+    "nats": ["nats@2.29.3", "", { "dependencies": { "nkeys.js": "1.1.0" } }, "sha512-tOQCRCwC74DgBTk4pWZ9V45sk4d7peoE2njVprMRCBXrhJ5q5cYM7i6W+Uvw2qUrcfOSnuisrX7bEx3b3Wx4QA=="],
+
+    "nats.ws": ["nats.ws@1.30.3", "", { "optionalDependencies": { "nkeys.js": "1.1.0" } }, "sha512-aM77V2SEc+B6lbxCMZK3qfRy4jg8pmHj+wZzQKDiDIQYhLPj6U2NSHHBex0syj72Ayzl4uR5Lp3aKXTaVLbRpw=="],
+
+    "nkeys.js": ["nkeys.js@1.1.0", "", { "dependencies": { "tweetnacl": "1.0.3" } }, "sha512-tB/a0shZL5UZWSwsoeyqfTszONTt4k2YS0tuQioMOD180+MbombYVgzDUYHlx+gejYK6rgf08n/2Df99WY0Sxg=="],
+
+    "tweetnacl": ["tweetnacl@1.0.3", "", {}, "sha512-6rt+RN7aOi1nGMyC4Xa5DdYiukl2UWCbcJft7YhxReBGQD7OAM8Pbxw6YMo4r2diNEA8FEmu32YOn9rhaiE5yw=="],
+
+    "typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
+
+    "undici-types": ["undici-types@7.16.0", "", {}, "sha512-Zz+aZWSj8LE6zoxD+xrjh4VfkIG8Ya6LvYkZqtUQGJPZjYl53ypCaUwWqo7eI0x66KBGeRo+mlBEkMSeSZ38Nw=="],
+  }
+}
+
+docker-compose.yaml
+x-healthcheck: &healthcheck
+  interval: 30s
+  timeout: 5s
+  retries: 15
+  start_period: 3s
+  start_interval: 1s
+
+x-nats-box: &nats-box
+  image: natsio/nats-box:${NATS_BOX_VER?:}
+  restart: no
+  entrypoint: /bin/sh
+  environment:
+    - NATS_OPERATOR
+    - NATS_ACCOUNT
+
+networks:
+  nats:
+    driver: bridge
+
+volumes:
+  nsc_data:
+  nsc_config:
+  nats_data:
+
+services:
+  nats-init:
+    <<: *nats-box
+    command: /entrypoint.sh
+    volumes:
+      - nsc_data:/nsc
+      - nsc_config:/config
+      - ${PWD}/fs/nats-init/entrypoint.sh:/entrypoint.sh:ro
+
+  nats-server:
+    image: nats:${NATS_VER?:}
+    restart: unless-stopped
+    command: -c /etc/nats/nats.conf
+    ports:
+      - 4222:4222 # NATS
+      - 6222:6222 # Cluster
+      - 8222:8222 # Monitoring
+      - 9222:9222 # WebSocket
+    volumes:
+      - nats_data:/data
+      - nsc_config:/etc/nats/nsc:ro
+      - ${PWD}/fs/nats-server/etc/nats/nats.conf:/etc/nats/nats.conf:ro
+    networks:
+      nats:
+        aliases:
+          - nats.lokal
+
+    depends_on:
+      nats-init:
+        condition: service_completed_successfully
+
+    healthcheck:
+      <<: *healthcheck
+      test: [CMD-SHELL, wget -q --spider http://localhost:8222/healthz]
+
+  nats-push:
+    <<: *nats-box
+    command: [-c, "nsc push -A"]
+    volumes:
+      - nsc_data:/nsc
+    networks:
+      - nats
+    depends_on:
+      nats-server:
+        condition: service_healthy
+
+  nats-export:
+    <<: *nats-box
+    command: /entrypoint.sh
+    volumes:
+      - nsc_data:/nsc
+      - ${PWD}/fs/nats-export/secrets:/secrets:rw
+      - ${PWD}/fs/nats-export/entrypoint.sh:/entrypoint.sh:ro
+    depends_on:
+      nats-push:
+        condition: service_completed_successfully
+
+docs/
+
+docs/AUTHENTICATION.md
+# NATS JWT Authentication Setup (NSC)
+
+This document explains how to set up **JWT-based authentication** for NATS using
+`nsc`. It is intentionally **deployment-agnostic** and focuses purely on
+concepts, commands, and verification.
+
+All commands are executed using the official
+[`natsio/nats-box:0.19.2`](https://hub.docker.com/r/natsio/nats-box) Docker
+image.
+
+## Table of Contents
+
+- [NATS JWT Authentication Setup (NSC)](#nats-jwt-authentication-setup-nsc)
+  - [Table of Contents](#table-of-contents)
+  - [Conceptual overview](#conceptual-overview)
+  - [1. Creating the operator](#1-creating-the-operator)
+    - [What does `account-jwt-server-url` actually do?](#what-does-account-jwt-server-url-actually-do)
+  - [2. Creating an account](#2-creating-an-account)
+  - [3. Generating the resolver configuration](#3-generating-the-resolver-configuration)
+  - [4. Starting the NATS server](#4-starting-the-nats-server)
+  - [5. Pushing account data to NATS](#5-pushing-account-data-to-nats)
+  - [6. Debugging and inspection](#6-debugging-and-inspection)
+    - [Listing operators](#listing-operators)
+    - [Listing accounts](#listing-accounts)
+    - [Listing keys](#listing-keys)
+    - [Listing seeds (private keys)](#listing-seeds-private-keys)
+  - [7. Inspecting account details](#7-inspecting-account-details)
+  - [8. Keys used for signing user JWTs](#8-keys-used-for-signing-user-jwts)
+    - [Account public key (issuer)](#account-public-key-issuer)
+    - [Account signing key (private)](#account-signing-key-private)
+    - [Extracting the signing seed](#extracting-the-signing-seed)
+  - [9. Example: signing a user JWT](#9-example-signing-a-user-jwt)
+  - [10. How This Maps to This Repository](#10-how-this-maps-to-this-repository)
+
+---
+
+## Conceptual overview
+
+NATS JWT authentication has three core entities:
+
+- **Operator** The root authority. Owns accounts and defines global trust.
+
+- **Account** Represents an isolated namespace with its own limits, users, and
+  permissions.
+
+- **User JWTs** Short-lived credentials signed by an account that define
+  publish/subscribe permissions.
+
+This guide walks through creating each layer in the correct order.
+
+---
+
+## 1. Creating the operator
+
+Create a new operator with a system account and signing key:
+
+```sh
+nsc add operator --generate-signing-key --sys --name my_operator
+```
+
+```txt
+[ OK ] generated and stored operator key "OBBMNDXWHOYLA5CMH47QKAKLEIHKGIZBXIH63WSPHPDHDSAQI7SBGITC"
+[ OK ] added operator "my_operator"
+[ OK ] When running your own nats-server, make sure they run at least version 2.2.0
+[ OK ] created operator signing key: OADCCYB6VSDLBRWHFAITYPCCLXYSCVAEJG546B7UBLHZTJXYW3IUWDGJ
+[ OK ] created system_account: name:SYS id:ADPWZT7BFKFGQNCLBGPGS5JYEL63E5E2U3R2NXB2Q37VFEDVU7BXB75X
+[ OK ] created system account user: name:sys id:UBUKIFZBXVJQDITR4JBWJORJSDAYU32UFTZGUSILNYWHIIPEU6ISVJJ7
+[ OK ] system account user creds file stored in `/nsc/nkeys/creds/my_operator/SYS/sys.creds`
+```
+
+Enforce signing-key usage and configure the account JWT resolver URL:
+
+```sh
+nsc edit operator --require-signing-keys --account-jwt-server-url "nats://0.0.0.0:4222"
+```
+
+```txt
+[ OK ] strict signing key usage set to: true
+[ OK ] set account jwt server url to "nats://0.0.0.0:4222"
+[ OK ] edited operator "my_operator"
+```
+
+### What does `account-jwt-server-url` actually do?
+
+When `account-jwt-server-url` is set, the NATS server knows **where to fetch
+account JWTs from**.
+
+In this setup, the server is configured to:
+
+- Fetch account claims **from itself**
+- Use the embedded resolver generated by `nsc`
+
+This means:
+
+- No external JWT server is required
+- Account updates are pushed directly via `nsc push`
+- The server remains fully self-contained
+
+This is the simplest and most common production setup for single-cluster NATS.
+
+---
+
+## 2. Creating an account
+
+Create a new account under the operator:
+
+```sh
+nsc add account my_account
+```
+
+```txt
+[ OK ] generated and stored account key "ABT6QBISNJWXEW5QGCSWV6WWYZWOXEHU6G54XPA44ANTXO7EHXTIH6NI"
+[ OK ] added account "my_account"
+```
+
+Generate an **account signing key**. This key will later be used to sign user
+JWTs:
+
+```sh
+nsc edit account my_account --sk generate
+```
+
+```txt
+[ OK ] added signing key "AAAAKEVGK3YQSLEEYDHHD36ETWKWAZZHWFFDDIZW3FINAVWYCHOEXW6A"
+[ OK ] edited account "my_account"
+```
+
+---
+
+## 3. Generating the resolver configuration
+
+NATS uses a **JWT resolver** to fetch account claims. Generate the resolver
+configuration:
+
+```sh
+nsc generate config --nats-resolver --sys-account SYS > ./resolver.conf
+```
+
+---
+
+## 4. Starting the NATS server
+
+Start NATS with the generated resolver configuration:
+
+```sh
+nats -c resolver.conf
+```
+
+Alternatively, you can include this config in your `nats.conf` file:
+
+```conf
+# NATS Clients Port
+port: 4222
+
+# Other configuration options
+
+# NATS JWT Resolver
+include ./resolver.conf
+```
+
+Then you can start the server as usual:
+
+```sh
+nats -c nats.conf
+```
+
+---
+
+## 5. Pushing account data to NATS
+
+After starting the NATS server (with `resolver.conf` included), publish all
+account JWTs to the running server:
+
+> [!NOTE]  
+> Make sure you are in the same environment where you created the operator and
+> account (see [Creating the Operator](#1-creating-the-operator) and
+> [Creating the Account](#2-creating-an-account)).
+
+```sh
+nsc push -A
+```
+
+This ensures that all accounts and signing keys are available to the server for
+authentication.
+
+---
+
+## 6. Debugging and inspection
+
+### Listing operators
+
+```sh
+nsc list operators
+```
+
+```txt
++------------------------------------------------------------------------+
+|                               Operators                                |
++-------------+----------------------------------------------------------+
+| Name        | Public Key                                               |
++-------------+----------------------------------------------------------+
+| my_operator | OBBMNDXWHOYLA5CMH47QKAKLEIHKGIZBXIH63WSPHPDHDSAQI7SBGITC |
++-------------+----------------------------------------------------------+
+```
+
+---
+
+### Listing accounts
+
+```sh
+nsc list accounts
+```
+
+```txt
++-----------------------------------------------------------------------+
+| Accounts                                                              |
++------------+----------------------------------------------------------+
+| Name       | Public Key                                               |
++------------+----------------------------------------------------------+
+| SYS        | ADPWZT7BFKFGQNCLBGPGS5JYEL63E5E2U3R2NXB2Q37VFEDVU7BXB75X |
+| my_account | ABT6QBISNJWXEW5QGCSWV6WWYZWOXEHU6G54XPA44ANTXO7EHXTIH6NI |
++------------+----------------------------------------------------------+
+```
+
+---
+
+### Listing keys
+
+```sh
+nsc list keys
+```
+
+```txt
++-----------------------------------------------------------------------------------------------+
+|                                             Keys                                              |
++-------------+----------------------------------------------------------+-------------+--------+
+| Entity      | Key                                                      | Signing Key | Stored |
++-------------+----------------------------------------------------------+-------------+--------+
+| my_operator | OBBMNDXWHOYLA5CMH47QKAKLEIHKGIZBXIH63WSPHPDHDSAQI7SBGITC |             | *      |
+| my_operator | OADCCYB6VSDLBRWHFAITYPCCLXYSCVAEJG546B7UBLHZTJXYW3IUWDGJ | *           | *      |
+|  my_account | ABT6QBISNJWXEW5QGCSWV6WWYZWOXEHU6G54XPA44ANTXO7EHXTIH6NI |             | *      |
+|  my_account | AAAAKEVGK3YQSLEEYDHHD36ETWKWAZZHWFFDDIZW3FINAVWYCHOEXW6A | *           | *      |
++-------------+----------------------------------------------------------+-------------+--------+
+```
+
+---
+
+### Listing seeds (private keys)
+
+> [!CAUTION]  
+> Signing keys are secrets and must be treated with care.
+
+```sh
+nsc list keys --show-seeds
+```
+
+```txt
++----------------------------------------------------------------------------------------+
+|                                       Seeds Keys                                       |
++-------------+------------------------------------------------------------+-------------+
+| Entity      | Private Key                                                | Signing Key |
++-------------+------------------------------------------------------------+-------------+
+| my_operator | SOAE4GW4K7BYO2327I3GE2ZQILOTNGV4QEOC4DYFKN6UG6E5BZIAIIMRNA |             |
+| my_operator | SOAPQQCSOBMMSSZS4NFAQ4BLXSTAMMD5E3XOG547VPEHKPTM6YFPX2YM7Y | *           |
+|  my_account | SAACZEZRPNTFT2NKAB726KSNVOAUEMY5PFMBPK27GDXC7CCNLRHU3S77UM |             |
+|  my_account | SAALMQV2WCX4XF2GZCUCSS2NIF5KD7CFMNLN27N6IWKIEJKOL5Y7NYB57M | *           |
++-------------+------------------------------------------------------------+-------------+
+```
+
+---
+
+## 7. Inspecting account details
+
+Describe the account in JSON form:
+
+```sh
+nsc describe account --name=my_account --json
+```
+
+```json
+{
+  "iat": 1765913025,
+  "iss": "OADCCYB6VSDLBRWHFAITYPCCLXYSCVAEJG546B7UBLHZTJXYW3IUWDGJ",
+  "jti": "QIN2SKKOP4FWIRQRESC6DCEWL4BTOPNAHJUSWPMLMAR4ISSM3IAA",
+  "name": "my_account",
+  "nats": {
+    "authorization": {},
+    "default_permissions": {
+      "pub": {},
+      "sub": {}
+    },
+    "limits": {
+      "conn": -1,
+      "consumer": -1,
+      "data": -1,
+      "disk_max_stream_bytes": -1,
+      "exports": -1,
+      "imports": -1,
+      "leaf": -1,
+      "max_ack_pending": -1,
+      "mem_max_stream_bytes": -1,
+      "payload": -1,
+      "streams": -1,
+      "subs": -1,
+      "wildcards": true
+    },
+    "signing_keys": [
+      "AAAAKEVGK3YQSLEEYDHHD36ETWKWAZZHWFFDDIZW3FINAVWYCHOEXW6A"
+    ],
+    "type": "account",
+    "version": 2
+  },
+  "sub": "ABT6QBISNJWXEW5QGCSWV6WWYZWOXEHU6G54XPA44ANTXO7EHXTIH6NI"
+}
+```
+
+---
+
+## 8. Keys used for signing user JWTs
+
+### Account public key (issuer)
+
+This value is referenced as `issuer_account` when encoding user JWTs:
+
+```sh
+nsc describe account --name=my_account --json | jq -r '.sub'
+```
+
+```txt
+ABT6QBISNJWXEW5QGCSWV6WWYZWOXEHU6G54XPA44ANTXO7EHXTIH6NI
+```
+
+---
+
+### Account signing key (private)
+
+This key signs user JWTs:
+
+```sh
+nsc describe account --name=my_account --json | jq -r '.nats.signing_keys[0]'
+```
+
+```txt
+AAAAKEVGK3YQSLEEYDHHD36ETWKWAZZHWFFDDIZW3FINAVWYCHOEXW6A
+```
+
+---
+
+### Extracting the signing seed
+
+Locate the signing seed under `/nsc/nkeys/keys`:
+
+```sh
+nsc describe account --name my_account --json | jq -r '.nats.signing_keys[0]' | xargs -I% find /nsc/nkeys/keys -name '%.nk' -exec cat {} \;
+```
+
+> [!CAUTION]  
+> Signing keys are secrets and must be treated with care.
+
+```txt
+SAALMQV2WCX4XF2GZCUCSS2NIF5KD7CFMNLN27N6IWKIEJKOL5Y7NYB57M
+```
+
+---
+
+## 9. Example: signing a user JWT
+
+```js
+const accountKey = "..."; // account public key
+const accountSeed = "..."; // account signing seed
+
+const accountKeyPair = fromSeed(encodeText(accountSeed));
+
+const jwt = await encodeUser(
+  "user-id",
+  userKeyPair,
+  accountKeyPair,
+  {
+    issuer_account: accountKey,
+    pub: { allow: ["users.id.>"], deny: [] },
+    sub: { allow: ["users.id.>"], deny: [] },
+  },
+  { exp: Math.floor(Date.now() / 1000) + 30 * 60 }
+);
+```
+
+This JWT can now be used by clients to authenticate with NATS.
+
+```js
+import { connect, credsAuthenticator } from "nats.ws";
+
+const nc = await connect({ authenticator: credsAuthenticator(creds) });
+```
+
+After connecting to NATS, if the client tries to access a resource it should not
+have access to, it will be denied.
+
+```js
+try {
+  for await (const msg of nc.subscribe("users.prohibited.subject")) {
+  }
+} catch (err) {
+  if (/Permissions.Violation/i.test(String(err))) {
+    console.info("Expected permissions violation error.");
+  } else {
+    throw err;
+  }
+}
+```
+
+On the other hand, if the client tries to access a resource it should have
+access to, it will be allowed.
+
+```js
+for await (const msg of nc.subscribe("users.id.subject")) {
+  console.info(msg.data); // UInt8Array
+}
+```
+
+## 10. How This Maps to This Repository
+
+This document describes the conceptual steps. In this repository, they are
+automated as follows:
+
+- **Steps 1–3**
+
+  - Performed by the `nats-init` container
+  - Operator, account, signing keys, and resolver config are generated once
+
+- **Step 4**
+
+  - `nats-server` starts with the generated resolver configuration
+
+- **Step 5**
+
+  - `nats-push` runs `nsc push -A` after the server becomes healthy
+
+- **Steps 8–9**
+
+  - `nats-export` extracts the account signing key
+  - Used by application services to mint user JWTs
+
+The repository intentionally separates **bootstrap**, **runtime**, and
+**credential export** into distinct containers to keep authority boundaries
+explicit.
+
+fs/
+
+fs/nats-export/
+
+fs/nats-export/entrypoint.sh
+#!/bin/sh
+set -e
+
+echo "=== NATS Signing Keys ==="
+echo
+echo "Store these in your .env file:"
+echo
+
+export_keys() {
+  kind="$1"
+  name="$2"
+
+  sub_desc="$(nsc describe "$kind" --name "$name" --json)"
+  sub_key="$(echo "$sub_desc" | jq -r '.sub')"
+  sub_secret="$(echo "$sub_desc" | jq -r '.nats.signing_keys[0]' | xargs -I% find /nsc/nkeys -name '%.nk' -exec cat {} \;)"
+
+  : "${sub_key:?Unable to extract $kind key for $name}"
+  : "${sub_secret:?Unable to extract $kind secret for $name}"
+
+  kind_upper="$(echo $kind | tr 'a-z' 'A-Z')"
+
+  echo "NATS_${kind_upper}_KEY=\"$sub_key\"" > /secrets/.env.$kind
+  echo "NATS_${kind_upper}_SECRET=\"$sub_secret\"" >> /secrets/.env.$kind
+
+  echo "Exported $kind keys to ./fs/nats-export/secrets/.env.$kind"
+}
+
+###################################################
+# CAUTION                                         #
+# Exporting operator keys is not recommended!     #
+#                                                 #
+###################################################
+# export_keys "operator" "$NATS_OPERATOR"
+
+export_keys "account" "$NATS_ACCOUNT"
+
+fs/nats-init/
+
+fs/nats-init/entrypoint.sh
+#!/bin/sh
+set -e
+
+MISSING_ENV="Missing environment variable"
+
+: "${NATS_OPERATOR:?$MISSING_ENV}" # e.g., MY_OPERATOR
+: "${NATS_ACCOUNT:?$MISSING_ENV}"  # e.g., MY_API_ACCOUNT
+
+OPERATOR_DIR="/nsc/nats/nsc/stores/$NATS_OPERATOR"
+
+if [ -d "$OPERATOR_DIR" ]; then
+  echo "NATS operator already initialized for $NATS_OPERATOR"
+  exit 0
+else
+  nsc add operator --generate-signing-key --sys --name $NATS_OPERATOR
+  nsc edit operator --require-signing-keys --account-jwt-server-url "nats://nats.lokal:4222"
+  nsc add account $NATS_ACCOUNT
+  nsc edit account $NATS_ACCOUNT --sk generate
+
+  nsc generate config --nats-resolver --sys-account SYS > /config/resolver.conf
+fi
+
+fs/nats-server/
+
+fs/nats-server/etc/
+
+fs/nats-server/etc/nats/
+
+fs/nats-server/etc/nats/nats.conf
+# NATS Clients Port
+port: 4222
+# PID file shared with configuration reloader.
+# pid_file: "/var/run/nats/nats.pid"
+###############
+#             #
+# Monitoring  #
+#             #
+###############
+http: 8222
+server_name: nats-0
+server_tags: [
+"mem:4Gi",
+]
+###################################
+#                                 #
+# NATS JetStream                  #
+#                                 #
+###################################
+jetstream {
+    max_mem:2G
+    store_dir: "/data"
+    max_file:10Gi
+    unique_tag: "natsuniquetag"
+}
+
+###################################
+#                                 #
+# NATS WebSocket                  #
+#                                 #
+###################################
+websocket {
+    listen: "0.0.0.0:9222"
+    no_tls: true
+}
+###################################
+#                                 #
+# NATS Full Mesh Clustering Setup #
+#                                 #
+###################################
+# cluster {
+#     name: natscluster
+#     port: 6222
+#     routes = [
+#     nats://nats-0.nats.nats.svc.cluster.local:6222
+#     nats://nats-1.nats.nats.svc.cluster.local:6222
+#     nats://nats-2.nats.nats.svc.cluster.local:6222
+
+#     ]
+#     cluster_advertise: $CLUSTER_ADVERTISE
+#     connect_retries: 120
+# }
+lame_duck_grace_period: 10s
+lame_duck_duration: 30s
+
+include ./nsc/resolver.conf
+
+index.ts
+console.log("Hello via Bun!");
+package.json
+{
+  "name": "nats-docker-compose-recipe",
+  "module": "src/client.ts",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "bun --watch src/client.ts",
+    "start": "bun src/client.ts"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@nats-io/jwt": "^0.0.10-5",
+    "@types/node": "^25.0.3",
+    "dotenv": "^17.2.3",
+    "nats": "^2.29.3",
+    "nats.ws": "^1.30.3",
+    "nkeys.js": "^1.1.0"
+  }
+}
+
+README.md
+# NATS Service
+
+This repository defines the **NATS messaging service** with JWT authentication
+enabled. The setup is fully containerized and designed to be reproducible across
+environments.
+
+## Quick Start
+
+### 1. Clone the repository
+
+Clone the repository and navigate to the directory.
+
+```sh
+git clone https://github.com/teyfix/nats-docker-compose-recipe.git
+cd nats-docker-compose-recipe
+```
+
+### 2. Update enviroment variables in `.env` as needed
+
+Although repository has the `.env` file with default values, you can override
+them as needed.
+
+```sh
+NATS_OPERATOR="my_operator"
+NATS_ACCOUNT="my_account"
+NATS_VER="2.10"
+NATS_BOX_VER="0.19.2"
+```
+
+### 3. Bootstrap and start NATS
+
+Bootstrap the system and start the NATS server. We are starting `nats-export`
+container so the signing keys will be exported after the NATS server starts.
+
+```sh
+docker compose up nats-init nats-server nats-push nats-export
+```
+
+### 4. Run the example client
+
+```sh
+# 3. Run the example client
+bun install
+bun run dev
+```
+
+## Table of Contents
+
+- [NATS Service](#nats-service)
+  - [Quick Start](#quick-start)
+    - [1. Clone the repository](#1-clone-the-repository)
+    - [2. Update enviroment variables in `.env` as needed](#2-update-enviroment-variables-in-env-as-needed)
+    - [3. Bootstrap and start NATS](#3-bootstrap-and-start-nats)
+    - [4. Run the example client](#4-run-the-example-client)
+  - [Table of Contents](#table-of-contents)
+  - [What This Service Does](#what-this-service-does)
+  - [Architecture Overview](#architecture-overview)
+    - [Containers](#containers)
+  - [Configuration Details](#configuration-details)
+    - [NATS Server (`nats.conf`)](#nats-server-natsconf)
+  - [Authentication Model](#authentication-model)
+  - [Security Model (Read This Carefully)](#security-model-read-this-carefully)
+    - [Trust boundaries](#trust-boundaries)
+    - [Critical rules](#critical-rules)
+  - [Traefik Exposure](#traefik-exposure)
+  - [Volumes](#volumes)
+  - [Environment Variables](#environment-variables)
+  - [Typical Use Cases](#typical-use-cases)
+  - [Allowing clients to connect](#allowing-clients-to-connect)
+  - [Notes](#notes)
+  - [Startup Order](#startup-order)
+  - [Health Check](#health-check)
+
+---
+
+## What This Service Does
+
+At a high level, this service:
+
+- Runs a **NATS server** with:
+
+  - Core NATS (TCP clients)
+  - **JetStream** for persistence and replay
+  - **WebSocket** support for browser-based clients
+
+- Bootstraps **NATS Operator and Account** state automatically using `nsc`
+- Generates and exports **signing keys** for external services
+- Exposes NATS, WebSocket, and monitoring endpoints through **Traefik**
+- Stores all state (JetStream + NSC) in Docker volumes
+
+This allows application services to authenticate using **JWTs**, without NATS
+needing to consult an external database or authority.
+
+---
+
+## Architecture Overview
+
+### Containers
+
+- **nats-init**
+
+  - One-time bootstrap container
+  - Creates:
+
+    - Operator
+    - System account
+    - Application account
+    - Account signing key
+
+  - Generates the JWT resolver configuration
+  - Idempotent: exits immediately if state already exists
+
+- **nats-server**
+
+  - The actual NATS server
+  - JetStream enabled
+  - Loads resolver configuration generated by `nats-init`
+  - Exposes:
+
+    - TCP clients (`4222`)
+    - WebSocket clients (`9222`)
+    - Monitoring (`8222`)
+
+- **nats-push**
+
+  - Pushes operator and account JWTs into the running server
+  - Runs `nsc push -A`
+  - Ensures the server has the latest account claims
+
+- **nats-export**
+
+  - Extracts **account signing keys** for external use
+  - Writes them to `.env`-style files
+  - Intended for trusted backend services only
+
+---
+
+## Configuration Details
+
+### NATS Server (`nats.conf`)
+
+- **Client Port:** `4222`
+- **Monitoring:** `http://:8222`
+- **WebSocket:** `0.0.0.0:9222` (no TLS, TLS handled by Traefik)
+- **JetStream:**
+
+  - Memory: `2G`
+  - Disk: `10Gi`
+  - Data directory: `/data`
+
+- **Graceful shutdown:**
+  - Lame duck mode enabled for safe restarts
+
+JWT resolution is handled via an **NSC-generated resolver** included at startup.
+
+---
+
+## Authentication Model
+
+This service uses **NATS JWT-based authentication**:
+
+- Operator and Account are created automatically
+- Clients authenticate using **user JWTs**
+- NATS does **not** perform per-room or per-subject authorization checks beyond
+  JWT claims
+- Authorization logic lives entirely in application services
+
+This means:
+
+- No database tables are required for NATS auth
+- Room join/leave enforcement is handled at the app layer
+- NATS acts purely as a message router + persistence layer
+
+---
+
+## Security Model (Read This Carefully)
+
+This setup uses **JWT-based authorization**, where trust is derived from
+cryptographic keys rather than server-side state.
+
+### Trust boundaries
+
+- **Operator**
+
+  - Root authority
+  - Defines global trust
+  - Should almost never be used outside bootstrapping
+
+- **Account**
+
+  - Represents an isolated namespace
+  - Owns users and permissions
+  - Signs user JWTs via an **account signing key**
+
+- **User JWTs**
+
+  - Short-lived credentials
+  - Define exact publish/subscribe permissions
+  - Can be safely issued by application services
+
+### Critical rules
+
+- **NATS never stores user secrets**
+- **Account signing keys are powerful**
+
+  - Anyone with this key can mint arbitrary users
+
+- **User JWTs should be short-lived**
+- **`nats-export` is intentionally dangerous**
+
+  - It extracts private signing keys
+  - Intended for CI or trusted backend services only
+  - Never expose exported keys to browsers or clients
+
+If an attacker obtains:
+
+- **Account signing seed** → they can create any user
+- **User credentials** → damage is limited by JWT permissions and expiration
+
+This design favors **stateless authorization**, **clear authority**, and
+**predictable failure modes**.
+
+---
+
+## Traefik Exposure
+
+The service is exposed through Traefik with:
+
+- **TCP (TLS):** `nats.<domain>` → port `4222`
+- **WebSocket (HTTPS):** `https://nats.<domain>/ws`
+- **Monitoring UI (HTTPS):** `https://nats.<domain>/`
+
+TLS termination is handled by Traefik using the configured certificate resolver.
+
+---
+
+## Volumes
+
+- `nats_data` – JetStream persistence
+- `nsc_data` – NSC state (operator, accounts, keys)
+- `nsc_config` – Generated resolver configuration
+
+These volumes allow the system to restart without losing identity or message
+state.
+
+---
+
+## Environment Variables
+
+Required:
+
+- `NATS_OPERATOR` – Operator name
+- `NATS_ACCOUNT` – Account name
+
+Optional / infrastructure-dependent:
+
+- `NATS_VER`
+- `NATS_BOX_VER`
+- `TRAEFIK_*` variables
+
+Exported signing keys are written to:
+
+- `svc/nats/fs/nats-export/secrets/.env.operator`
+- `svc/nats/fs/nats-export/secrets/.env.account`
+
+---
+
+## Typical Use Cases
+
+- Real-time messaging between backend services
+- Browser clients connecting via WebSockets
+- Temporary or long-lived rooms backed by JetStream
+- Event-driven workflows with replay and durability
+
+---
+
+## Allowing clients to connect
+
+After obtaining the account credentials with `nats-export` container, you can
+generate NATS credentials for users and allow them to connect themselves.
+
+Here is the trimmed version of
+[example-client.ts](./docs/examples/example-client.ts):
+
+```ts
+import { connect, credsAuthenticator } from "nats.ws";
+import { encodeUser } from "nats-jwt";
+import { createUser, fromSeed } from "nkeys.js";
+
+const encodeText = (text: string) => new TextEncoder().encode(text);
+const decodeText = (text: Uint8Array) => new TextDecoder().decode(text);
+
+// Can be obtained with `nats-export` container
+const accountKey = process.env.NATS_ACCOUNT_KEY!;
+const accountSeed = process.env.NATS_ACCOUNT_SECRET!;
+
+// The user we want to create credentials for.
+const userId = "john-doe";
+
+// Create user keypair
+const userKP = createUser();
+const userSeed = decodeText(userKP.getSeed());
+
+// Load account keypair (issuer)
+const accountKP = fromSeed(encodeText(accountSeed));
+
+// UNIX timestamp for expiration
+const exp = Math.floor(Date.now() / 1000) + 30 * 60;
+
+// Encode & sign user JWT
+const jwt = await encodeUser(
+  `user-${userId}`, //
+  userKP,
+  accountKP,
+  {
+    issuer_account: accountKey,
+    pub: { allow: [`users.${userId}.>`], deny: [] },
+    sub: { allow: [`users.${userId}.>`], deny: [] },
+  },
+  { exp }
+);
+
+const creds = `
+-----BEGIN NATS USER JWT-----
+${jwt}
+------END NATS USER JWT------
+
+-----BEGIN USER NKEY SEED-----
+${userSeed}
+------END USER NKEY SEED------
+`;
+
+const client = await connect({
+  authenticator: credsAuthenticator(encodeText(creds)),
+});
+```
+
+---
+
+## Notes
+
+- Clustering is currently disabled but pre-configured in comments
+- WebSocket TLS is intentionally disabled at NATS level
+- All authority is derived from JWTs, not server-side state
+
+---
+
+## Startup Order
+
+1. `nats-init` initializes operator/account
+2. `nats-server` starts with resolver config
+3. `nats` pushes NSC state
+4. `nats-export` optionally exports signing keys
+
+---
+
+## Health Check
+
+The NATS server is considered healthy when:
+
+```sh
+wget -q --spider http://localhost:8222/healthz
+```
+
+returns successfully.
+
+---
+
+This setup prioritizes **stateless authorization**, **simple operations**, and
+**clear separation of concerns** between messaging infrastructure and
+application logic.
+
+src/
+
+src/client.ts
+import { encodeUser } from "@nats-io/jwt";
+import { config } from "dotenv";
+import { createUser, fromSeed } from "nkeys.js";
+import { existsSync } from "node:fs";
+import { resolve } from "node:path";
+
+type NativeClient = typeof import("nats");
+type WebSocketClient = typeof import("nats.ws");
+
+type NATSClient = NativeClient | WebSocketClient;
+
+const encodeText = (text: string): Uint8Array => new TextEncoder().encode(text);
+const decodeText = (text: Uint8Array): string => new TextDecoder().decode(text);
+
+const WORKDIR = process.cwd();
+
+const ENV_FILE = resolve(WORKDIR, ".env");
+const ACCOUNT_ENV_FILE = resolve(
+  WORKDIR,
+  "fs/nats-export/secrets/.env.account"
+);
+
+const relativePath = (path: string): string => path.replace(WORKDIR, ".");
+
+/**
+ * Import which NATS client to use
+ * based on the `USE_WEBSOCKET` environment variable.
+ *
+ * We prefer to use `nats.ws` if `USE_WEBSOCKET` is not set.
+ *
+ * @returns {Promise<NATSClient>}
+ */
+const importNATS = async (): Promise<NATSClient> => {
+  const useWebSocket = process.env.USE_WEBSOCKET;
+
+  if ([undefined, "true", "1"].includes(useWebSocket)) {
+    return import("nats.ws");
+  }
+
+  return import("nats");
+};
+
+const getConfig = (): Record<"accountKey" | "accountSeed", string> => {
+  const dockerCommand = "docker compose up nats-export";
+
+  config({ path: [ENV_FILE, ACCOUNT_ENV_FILE], quiet: true });
+
+  if (!existsSync(ACCOUNT_ENV_FILE)) {
+    const envFile = relativePath(ACCOUNT_ENV_FILE);
+
+    console.error('Missing "%s" file.', envFile);
+    console.error("Did you run `%s`?", dockerCommand);
+    console.info();
+
+    throw new Error(`Account env file not found: ${envFile}`);
+  }
+
+  const accountKey = process.env.NATS_ACCOUNT_KEY;
+  const accountSeed = process.env.NATS_ACCOUNT_SECRET;
+
+  if (accountKey && accountSeed) {
+    return { accountKey, accountSeed };
+  }
+
+  throw new Error(
+    `Missing required environment variables! Did you run ${dockerCommand}?`
+  );
+};
+
+async function main(): Promise<void> {
+  const { connect, credsAuthenticator } = await importNATS();
+  const { accountKey, accountSeed } = getConfig();
+
+  /**
+   * The user we want to create credentials for.
+   */
+  const userId = "john-doe";
+
+  // Create user keypair
+  const userKP = createUser();
+  const userSeed = decodeText(userKP.getSeed());
+
+  // Load account keypair (issuer)
+  const accountKP = fromSeed(encodeText(accountSeed));
+
+  // UNIX timestamp for expiration
+  const exp = Math.floor(Date.now() / 1000) + 30 * 60;
+
+  // Encode & sign user JWT
+  const jwt = await encodeUser(
+    // User `name` for the JWT (only informational)
+    `user-${userId}`,
+    userKP,
+    accountKP,
+    {
+      issuer_account: accountKey,
+      pub: { allow: [`users.${userId}.>`], deny: [] },
+      sub: { allow: [`users.${userId}.>`], deny: [] },
+    },
+    { exp }
+  );
+
+  /**
+   * Standard NATS user credentials format
+   */
+  const creds = `
+-----BEGIN NATS USER JWT-----
+${jwt}
+------END NATS USER JWT------
+
+-----BEGIN USER NKEY SEED-----
+${userSeed}
+------END USER NKEY SEED------
+`;
+
+  /**
+   * Connect to NATS
+   */
+  const nc = await connect({
+    servers: [
+      // WebSocket
+      "ws://localhost:9222",
+      // NATS
+      "nats://localhost:4222",
+    ],
+    authenticator: credsAuthenticator(encodeText(creds)),
+  });
+
+  console.info("Connected to NATS at %s", nc.getServer());
+  console.info();
+
+  console.info("Trying to subscribe to prohibited topic");
+
+  try {
+    /**
+     * # Subscribe to prohibited topic
+     *
+     * `users.>` means we want to subscribe to all the
+     * subjects/topics that starts with `users.`, we did not
+     * allow this in our `JWT` claims, therefore NATS server
+     * will reject the subscription.
+     */
+    const globalUserMessages = nc.subscribe("users.>");
+
+    for await (const message of globalUserMessages) {
+      console.log(message);
+    }
+  } catch (err) {
+    if (/Permissions.Violation/i.test(String(err))) {
+      console.info("Expected permissions violation error.");
+      console.info();
+    } else {
+      throw err;
+    }
+  }
+
+  console.info("Trying to subscribe to allowed topic");
+
+  try {
+    /**
+     * # Subscribe to allowed topic
+     * 
+     * `users.${userId}.>` means we want to subscribe to all the
+     * subjects/topics that starts with `users.${userId}.`, we did
+     * allow this in our `JWT` claims, therefore NATS server will
+     * allow the subscription.
+     */
+    const userNotifications = nc.subscribe(`users.${userId}.notifications`, {
+      timeout: 1000,
+    });
+
+    for await (const message of userNotifications) {
+      console.log(message);
+    }
+  } catch (err) {
+    if (/TIMEOUT/i.test(String(err))) {
+      console.info("Expected timeout error.");
+      console.info();
+    } else {
+      throw err;
+    }
+  }
+
+  await nc.close();
+}
+
+main()
+  .then(() => {
+    console.info("Successfully completed");
+  })
+  .catch((err) => {
+    console.error(err);
+  });
+
+tsconfig.json
+{
+  "compilerOptions": {
+    // Environment setup & latest features
+    "lib": ["ESNext"],
+    "target": "ESNext",
+    "module": "Preserve",
+    "moduleDetection": "force",
+    "jsx": "react-jsx",
+    "allowJs": true,
+
+    // Bundler mode
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "noEmit": true,
+
+    // Best practices
+    "strict": true,
+    "skipLibCheck": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+
+    // Some stricter flags (disabled by default)
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "noPropertyAccessFromIndexSignature": false
+  }
+}
+
