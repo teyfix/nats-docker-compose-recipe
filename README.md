@@ -279,8 +279,7 @@ Exported signing keys are written to:
 After obtaining the account credentials with `nats-export` container, you can
 generate NATS credentials for users and allow them to connect themselves.
 
-Here is the trimmed version of
-[example-client.ts](./docs/examples/example-client.ts):
+Here is the trimmed version of [src/client.ts](./src/client.ts):
 
 ```ts
 import { connect, credsAuthenticator } from "nats.ws";
